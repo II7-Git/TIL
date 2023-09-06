@@ -36,3 +36,30 @@
 ![4](/Assets/Images/Unreal/실습/CryptRaider/5.png)
 ![4](/Assets/Images/Unreal/실습/CryptRaider/6.png)
 ![4](/Assets/Images/Unreal/실습/CryptRaider/7.png)
+
+## Mover 벽 생성
+
+암호를 해결하면 문이 열리는 어드벤쳐 게임 형식이기에 암호가 풀렸을 때 열리는 조건을 가진 문이 필요하다. 그래서 Mover라는 클래스를 만들어 벽을 이동시키는 것을 구현했는데 이때 유용하게 쓰일 함수가 있다. 그 함수에 공식 문서를 참조한다.
+
+[FMath::VInterpConstantTo](https://docs.unrealengine.com/5.2/en-US/API/Runtime/Core/Math/FMath/VInterpConstantTo/)
+
+해당 함수의 원형을 보면 current위치를 target위치까지 일정한 스피드로 이동시키는 계산을 하여 FVector를 반환하는 함수인데 이를 잘 사용하면 쉽게 벽 이동을 구현할 수 있다.
+
+구현 예시
+
+```C++
+if (ShouldMove)
+	{
+		FVector CurrentLocation = GetOwner()->GetActorLocation();
+		FVector TargetLocation = OriginalLocation + MoveOffset;
+		float Speed = FVector::Distance(OriginalLocation, TargetLocation) / MoveTime;
+
+		FVector NewLocation = FMath::VInterpConstantTo(CurrentLocation, TargetLocation, DeltaTime, Speed);
+		GetOwner()->SetActorLocation(NewLocation);
+	}
+```
+
+위 처럼 Speed를 적절히 구해주고 목표 위치와 현재 위치를 계산 후 새로운 로케이션을 계산해 그 위치로 현재 액터를 변경해주면 원하는 기능을 구현할 수 있다.
+
+![8](/Assets/Images/Unreal/실습/CryptRaider/8.png)
+![9](/Assets/Images/Unreal/실습/CryptRaider/9.png)
