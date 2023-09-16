@@ -63,3 +63,12 @@ if (ShouldMove)
 
 ![8](/Assets/Images/Unreal/실습/CryptRaider/8.png)
 ![9](/Assets/Images/Unreal/실습/CryptRaider/9.png)
+
+## Grabber & 라인트레이스 기능 구현
+
+현재 내가 보고있는 물체를 잡아서 들어올리는 기능의 구현하려 한다.<br>
+그러기 위해서는 카메라가 보고 있는 물체가 무엇인지 파악해야 하는데 그때 사용하는 기능이 Line Trace 기능이다. 해당 기능에 대한 정리는 아래 글로 해놓았다.
+
+[트레이스 기능 정리](/Unreal%20Engine/이론%20및%20정리/트레이스%20기능%20정리.md)
+
+이 기능을 활용해서 현재 내가 어떠한 물체를 보고 있는지 정보를 알아내는 구현을 Grabber 클래스에 구현해내었다.
