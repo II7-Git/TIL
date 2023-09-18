@@ -72,3 +72,100 @@ if (ShouldMove)
 [트레이스 기능 정리](/Unreal%20Engine/이론%20및%20정리/트레이스%20기능%20정리.md)
 
 이 기능을 활용해서 현재 내가 어떠한 물체를 보고 있는지 정보를 알아내는 구현을 Grabber 클래스에 구현해내었다.
+
+### DrawDebugSphere()
+
+트레이스로 물체를 찾았을 때 물체의 좌표를 제대로 알아내는 것이 중요합니다. 이를 확인하기 위해서 DrawDebugSphere() 함수를 사용해서 Grab버튼을 눌렀을 때 걸린 벡터의 위치에 sphere를 그려서 대략적인 위치를 가늠해봅니다.
+
+```C++
+bool HasHit = GetWorld()->SweepSingleByChannel(
+		HitResult,
+		Start,
+		End,
+		FQuat::Identity,
+		ECC_GameTraceChannel2,
+		Sphere);
+
+	if (HasHit)
+	{
+		DrawDebugSphere(GetWorld(), HitResult.Location, 10, 10, FColor::Green, false, 5);
+		DrawDebugSphere(GetWorld(), HitResult.ImpactPoint, 10, 10, FColor::Red, false, 5);
+	}
+```
+
+위의 코드처럼 HitResult에서 얻게되는 두 위치에 DrawDebugSphere()를 활용해봅니다.
+
+아래 사진에서 초록구와 빨간구 위치를 보면 저희가 원하는 위치의 벡터를 구하면 Red의 위치인 HitResult.ImpactPoint가 필요한 벡터라는 것을 알 수 있습니다.
+![10](/Assets/Images/Unreal/실습/CryptRaider/10.png)
+
+## 물체 잡기 구현
+
+### PhysicsHandleComponent
+
+물체를 들어올리게 되면 원하는 위치로 물체를 들고다녀야하는데 이때 들고다니는 물체를 잡고 들고다니고 원하는 위치에 놓을때까지 벽을 통과하는 등의 물리적인 오류를 일으키면 안됩니다. 그렇기에 이때 사용되는 클래스가 UPhysicsHandleComponent 입니다.
+
+[UPhysicsHandleComponent 공식 문서](https://docs.unrealengine.com/5.3/en-US/API/Runtime/Engine/PhysicsEngine/UPhysicsHandleComponent/)
+
+이제 트레이스를 통해 원하는 액터를 얻은 뒤 PhysicsHandleComponent에 GrabComponentAtLocationWithRotation() 함수를 통해 세팅을 해줍니다.
+
+Grab()과 Tick() 으로 잡고 이동하는 코드
+
+```C++
+//PhysicsHandle에서 잡은 물체를 플레이어 이동에 맞춰 따라 이동하게 세팅해주는 Tick함수
+void UGrabber::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	UPhysicsHandleComponent *PhysicsHandle = GetPhysicsHandle();
+	if (PhysicsHandle == nullptr)
+	{
+		return;
+	}
+
+	FVector TargetLocation = GetComponentLocation() + GetForwardVector() * HoldDistance;
+	PhysicsHandle->SetTargetLocationAndRotation(TargetLocation, GetComponentRotation());
+}
+
+void UGrabber::Grab()
+{
+	UPhysicsHandleComponent *PhysicsHandle = GetPhysicsHandle();
+	if (PhysicsHandle == nullptr)
+	{
+		return;
+	}
+
+	FVector Start = GetComponentLocation();
+	FVector End = Start + GetForwardVector() * MaxGrabDistance;
+	DrawDebugLine(GetWorld(), Start, End, FColor::Red);
+	DrawDebugSphere(GetWorld(), End, 10, 10, FColor::Blue, false, 5);
+
+	FCollisionShape Sphere = FCollisionShape::MakeSphere(GrabRadius);
+	FHitResult HitResult;
+	// FQuat: 회전값을 알려주는 객체 ,본문에 쓰인 FQuat::Identity는 회전값이 없다는 표현
+	// SweepSingleByChannel():지정한 Collision Shape를 트레이스 시켜서 매개변수로 넣은 채널 소속의 첫번째 충돌체를 리턴하는 함수,충돌했다면 true리턴
+	bool HasHit = GetWorld()->SweepSingleByChannel(
+		HitResult,
+		Start,
+		End,
+		FQuat::Identity,
+		ECC_GameTraceChannel2,
+		Sphere);
+
+	if (HasHit)
+	{
+		//잡은 물체를 PhysicsHandle에 세팅해주기
+		PhysicsHandle->GrabComponentAtLocationWithRotation(
+			HitResult.GetComponent(),
+			NAME_None,
+			HitResult.ImpactPoint,
+			GetComponentRotation());
+	}
+}
+
+```
+
+실제 구현한 모습입니다.
+![11](/Assets/Images/Unreal/실습/CryptRaider/11.png)
+
+PhysicsHandle을 사용했기에 아래 사진처럼 벽문에 걸리면 물리적인 오류없이 부드럽게 이동하는 모습을 확인할 수 있습니다.
+
+![12](/Assets/Images/Unreal/실습/CryptRaider/12.png)
