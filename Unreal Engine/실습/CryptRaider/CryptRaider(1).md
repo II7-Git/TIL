@@ -169,3 +169,39 @@ void UGrabber::Grab()
 PhysicsHandle을 사용했기에 아래 사진처럼 벽문에 걸리면 물리적인 오류없이 부드럽게 이동하는 모습을 확인할 수 있습니다.
 
 ![12](/Assets/Images/Unreal/실습/CryptRaider/12.png)
+
+## 비밀 문 구현
+
+### 콜리전 Overlap 이벤트 구현
+
+문에 필요한 물건을 올려 두었을 때 문이 열리는 구조를 동작시키기 위해서는 문의 콜리전을 설치하고 해당 콜리전에 다른 액터가 들어왔을 때 이벤트가 발생해야합니다. 그렇기에 콜리전 반응을 Overlap으로 하고 Overlap이벤트를 켜주어야 합니다.
+
+이 콜리전 반응에 대한 자세한 정리는 아래 글에 해놓았습니다.
+
+[콜리전 정리](/Unreal%20Engine/이론%20및%20정리/콜리전%20정리.md)
+
+### 액터 태그 설정
+
+콜리전 내부의 플레이어를 비롯한 여러 액터들이 들어오게 될테지만 문을 열 수 있는 액터의 종류는 한정되야 합니다. 그래서 이러한 액터들에게 액터 태그를 달아주고 Overlap 이벤트 발동시 들어온 액터의 액터 태그를 조사하여 원하는 태그이면 동작하게 해줍니다.
+
+![12](/Assets/Images/Unreal/실습/CryptRaider/13.png)
+
+위 사진처럼 키 물건에 액터 태그를 달아주고 아래 코드처럼 액터의 태그를 비교해봅니다.
+
+```C++
+void UTriggerComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+    TArray<AActor *> Actors;
+    GetOverlappingActors(Actors);
+
+    for (AActor *Actor : Actors)
+    {
+		//액터 태그 비교
+        if (Actor->ActorHasTag(AcceptableActorTag))
+        {
+        }
+    }
+}
+```
