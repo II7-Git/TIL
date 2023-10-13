@@ -116,3 +116,68 @@ void ATank::Turn(float Value)
 그래서 true를 하게 되면 콜리전 프리셋에 설정한대로 콜리전을 구분해서 충돌하면 그 전 위치에서 멈추게 구현이 된다.
 
 이러한 기능들을 사용해서 이동을 구현했다.
+
+### Turret 회전 처리
+
+플레이 할 탱크와 상대가 될 타워에는 각각 미사일을 쏠 터렛이 존재하는데 플레이어는 이를 마우스 위치에 맞게 타워는 플레이어의 탱크에 위치에 맞게 회전해야할 필요가 있다.<br>
+그래서 회전 자체는 공통된 기능이고 TurretMesh를 사용하기에 공통된 함수로 BasePawn에서 회전을 구현한다.
+
+회전 함수
+
+```C++
+void ABasePawn::RotateTurret(FVector LookAtTarget)
+{
+	FVector ToTarget = LookAtTarget - TurretMesh->GetComponentLocation();
+	FRotator LookAtRotation = FRotator(0.f, ToTarget.Rotation().Yaw, 0.f);
+	TurretMesh->SetWorldRotation(FMath::RInterpTo(TurretMesh->GetComponentRotation(), LookAtRotation, UGameplayStatics::GetWorldDeltaSeconds(this), 25.f));
+}
+```
+
+보면 급격한 회전을 방지하기 위해 FMath::RinterpTo() 함수로 보간 처리를 해서 부드럽게 회전하게 의도했고 회전하는 LookAtRotation을 보면 Yaw값만 받아서 위아래로 회전을 막는다.
+
+이를 바탕으로 Tank와 Tower에서 Tick() 안에서 각각 사용하여 원하는 기능을 구현한다
+
+Tank.cpp
+
+```C++
+if (PlayerControllerRef)
+    {
+        FHitResult HitResult;
+
+        PlayerControllerRef->GetHitResultUnderCursor(
+            ECollisionChannel::ECC_Visibility,
+            false,
+            HitResult);
+
+        RotateTurret(HitResult.ImpactPoint);
+    }
+```
+
+마우스 위치에 값을 HitResult에 넣고 그 값을 바탕으로 회전
+
+Tower.cpp
+
+```C++
+
+if (Tank)
+    {
+        float Distance = FVector::Dist(GetActorLocation(), Tank->GetActorLocation());
+
+        if (Distance <= FireRange)
+        {
+            RotateTurret(Tank->GetActorLocation());
+        }
+    }
+```
+
+타워의 사거리 안에 있다면 탱크에 위치로 회전
+
+---
+
+이를 바탕으로 실행해보면 원하는 대로 구현된 것을 볼 수 있다.
+
+탱크의 터렛 회전
+![6](/Assets/Images/Unreal/실습/ToonTanks/6.png)
+
+타워의 터렛 회전
+![7](/Assets/Images/Unreal/실습/ToonTanks/7.png)
