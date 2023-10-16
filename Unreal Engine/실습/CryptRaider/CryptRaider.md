@@ -213,5 +213,3 @@ void UTriggerComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 최종 시연 모습
 
 [![Crypt Raider](https://img.youtube.com/vi/YNdiwpjKp6A/0.jpg)](https://youtu.be/YNdiwpjKp6A)
-
-## 추가 기능 구현
