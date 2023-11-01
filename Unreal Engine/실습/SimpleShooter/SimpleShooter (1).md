@@ -53,3 +53,8 @@ void AShooterCharacter::LookRightRate(float AxisValue)
 	AddControllerYawInput(AxisValue * RotationRate * GetWorld()->GetDeltaSeconds());
 }
 ```
+
+### 카메라 배치
+
+3인칭 시점에 맞게 오른 어깨 뒤에 스프링 암과 카메라를 달고 앵글을 조정해준다.
+![2](/Assets/Images/Unreal/실습/SimpleShooter/2.png)
