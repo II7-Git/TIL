@@ -38,3 +38,67 @@ Angle: 현재 플레이어의 회전 각도는 플레이어 기준에서의 로�
 
 최종적으로 미끄러지는 동작이 아닌 자연스럽게 이동하는 모습을 구현해낼 수 있었다.
 ![6](/Assets/Images/Unreal/실습/SimpleShooter/6.png)
+
+## Gun Actor 제작
+
+슈팅 게임에서 플레이어는 총기를 자유롭게 변경하고 사용하는 것이 중요하기에 이를 위해 Gun Actor를 만들고 이를 플레이어의 손에 붙이는 작업이 필요하다. 이를 과정으로 적어보면
+
+1. Gun Actor 생성
+2. Gun Actor 스폰
+3. 손 위치에 Gun Actor 부착
+
+정도의 과정이 될 것이다. 이를 하나씩 구현해보았다.
+
+### Gun Actor 생성
+
+Gun을 Actor를 상속받아서 만든다. 씬에 배치될 것이기에 USceneComponent를 만들어 RootComponent로 만들어주고 에셋에서 제공되는 총기의 메시 종류에 따라서 Mesh를 만들어주고 RootComponent에 붙혀준다.
+
+```C++
+AGun::AGun()
+{
+	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	PrimaryActorTick.bCanEverTick = true;
+
+	Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	SetRootComponent(Root);
+
+	Mesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Mesh"));
+	Mesh->SetupAttachment(Root);
+}
+```
+
+이렇게 해서 만든 클래스를 상속 받은 블루클래스를 만들고 그곳에 원하는 총기 메시를 붙혀준다.
+![11](/Assets/Images/Unreal/실습/SimpleShooter/11.png)
+
+### GunActor 스폰 후 손에 붙히기
+
+주의할 점은 현재 캐릭터 메시에서 기본적으로 제공되는 무기가 있기에 해당 무기를 숨겨주어야한다. 그리고 그 위치에 Actor를 붙히기 위해서 소켓을 하나 만들어 주어야한다.
+
+먼저 메시를 열어서 무기가 어느 메시 밑에 붙어있는지 확인해야한다. 확인해보면 "weapon_r" 밑에 붙어있는 것을 확인할 수 있는데 이러면 이 "weapon_r"을 숨겨준다.<br>
+또 무기를 붙힐 소켓을 "WeaponSocket"이라는 이름으로 "weapon_r" 밑에 만들어준다.
+![11](/Assets/Images/Unreal/실습/SimpleShooter/7.png)
+
+그 뒤 플레이어의 메시를 가져와서 다음 이름의 메시를 숨기는 코드이다.
+
+```C++
+GetMesh()->HideBoneByName(TEXT("weapon_r"), EPhysBodyOp::PBO_None);
+```
+
+다음은 총기 액터를 만들어준 뒤 우리가 만든 소켓에 메시를 붙히는 작업이다. 다음 코드에서 AttachToComponent()를 이용해 플레이어 메시에서 "WeaponSocket"을 찾아서 그 곳에 Gun Actor를 붙혀준다.<br> SetOwner()를 해준 이유는 전투를 처리할 때 총기를 발사한 주체가 누구인지 알아야하기 때문이다.
+
+```C++
+    Gun = GetWorld()->SpawnActor<AGun>(GunClass);
+	Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, TEXT("WeaponSocket"));
+    //총기의 주인 설정
+	Gun->SetOwner(this);
+```
+
+이를 완성하고 실행하면 총기가 손 쪽에 있지만 위치가 살짝 맞지 않는 것을 확인할 수 있는데 이는 실행하고 메시를 이동시켜서 손에 딱 맞는 위치로 조정해준다.
+
+![8](/Assets/Images/Unreal/실습/SimpleShooter/8.png)
+
+그 뒤 현재 총의 트랜스폼을 복사해주고 블루프린트로 가서 그 위치를 붙혀넣기 해준다.
+![9](/Assets/Images/Unreal/실습/SimpleShooter/9.png)
+
+이러면 총의 위치가 손에 위치에 맞게 배치된다.
+![10](/Assets/Images/Unreal/실습/SimpleShooter/10.png)
