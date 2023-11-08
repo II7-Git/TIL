@@ -102,3 +102,115 @@ GetMesh()->HideBoneByName(TEXT("weapon_r"), EPhysBodyOp::PBO_None);
 
 이러면 총의 위치가 손에 위치에 맞게 배치된다.
 ![10](/Assets/Images/Unreal/실습/SimpleShooter/10.png)
+
+## 총기 발사 구현
+
+### 발사 함수 틀 구현
+
+먼저 총기 발사를 처리하기 위한 발사 함수를 구현해야한다.
+
+총기 입장에서는 플레이어나 적이 모두 발사를 누를 수 있기에 PullTrigger()라는 함수를 만들고 플레이어는 PullTrigger()를 실행시킬 함수를 만든다.
+
+Gun.Cpp
+
+```C++
+void AGun::PullTrigger()
+{
+}
+```
+
+Player.Cpp 는 액션 바인딩을 해준다.
+
+```C++
+void AShooterCharacter::Shoot()
+{
+	Gun->PullTrigger();
+}
+```
+
+### 발사 이펙트 설정
+
+발사 시 총구에서 나오는 이펙트는 총구에 붙혀 있어야하기에 SpawnEmitterAttached()로 소켓에 붙혀야한다.
+
+먼저 소켓의 이름을 알아낸다.
+![12](/Assets/Images/Unreal/실습/SimpleShooter/12.png)
+
+그 뒤 총기 발사 버튼이 눌리면 해당 소켓에 이펙트를 부착하여 발동시킨다.
+
+```C++
+void AGun::PullTrigger()
+{
+	UGameplayStatics::SpawnEmitterAttached(MuzzleFlash, Mesh, TEXT("MuzzleFlashSocket"));
+}
+```
+
+![13](/Assets/Images/Unreal/실습/SimpleShooter/13.png)
+
+### RayCasting을 통한 발사 위치 설정
+
+TPS에서 에임의 기준은 플레이어의 카메라에서 보이는 크로스헤어가 기준이 된다.<br>
+즉 카메라에서 보는 위치의 벡터를 향해 총이 발사되어야 한다는 뜻이고 이는 카메라에서 보는 방향으로 RayCasting을 하여 해당 위치를 알아내야 적합하다는 뜻이다.
+
+그래서 먼저 카메라의 위치를 알아내기 위해서 DrawDebugCamera()를 통해 카메라 위치를 알아낸다.
+
+```C++
+void AGun::PullTrigger()
+{
+	UGameplayStatics::SpawnEmitterAttached(MuzzleFlash, Mesh, TEXT("MuzzleFlashSocket"));
+
+	APawn *OwnerPawn = Cast<APawn>(GetOwner());
+	if (OwnerPawn == nullptr)
+		return;
+	AController *OwnerController = OwnerPawn->GetController();
+	if (OwnerController == nullptr)
+		return;
+
+	FVector Location;
+	FRotator Rotation;
+	OwnerController->GetPlayerViewPoint(Location, Rotation);
+
+	DrawDebugCamera(GetWorld(), Location, Rotation, 90, 2, FColor::Red, true);
+}
+
+```
+
+디버그 시 카메라가 플레이어 카메라 위치에 그려진 모습
+![14](/Assets/Images/Unreal/실습/SimpleShooter/14.png)
+
+### LineTraceSingleByChannel()
+
+다음은 현재 구한 카메라 위치에서 LineTrace를 하여 원하는 채널에 속한 액터와 충돌할 시 값을 얻어내는 LineTrace를 실행한다.
+
+아래 코드는 카메라의 위치에서 목표로 한 End위치를 구해서 카메라 위치부터 End까지 라인 트레이스를 하여 내가 설정한 Bullet 트레이스 채널에 대해서 충돌한 HitResult를 리턴 받아서 그 위치에 디버그 드로우를 하는 코드이다.
+
+```C++
+void AGun::PullTrigger()
+{
+	UGameplayStatics::SpawnEmitterAttached(MuzzleFlash, Mesh, TEXT("MuzzleFlashSocket"));
+
+	APawn *OwnerPawn = Cast<APawn>(GetOwner());
+	if (OwnerPawn == nullptr)
+		return;
+	AController *OwnerController = OwnerPawn->GetController();
+	if (OwnerController == nullptr)
+		return;
+
+	FVector Location;
+	FRotator Rotation;
+	OwnerController->GetPlayerViewPoint(Location, Rotation);
+
+	// 현재 카메라 위치에서 카메라가 보는 방향으로 MaxRange만큼 이동한 벡터
+	FVector End = Location + Rotation.Vector() * MaxRange;
+
+	// TODO : LineTrace //ECC_GameTraceChannel1:만든 트레이스 채널 Bullet의 이름
+	FHitResult Hit;
+	bool bSuccess = GetWorld()->LineTraceSingleByChannel(Hit, Location, End, ECollisionChannel::ECC_GameTraceChannel1);
+	if (bSuccess)
+	{
+		DrawDebugPoint(GetWorld(), Hit.Location, 20, FColor::Red, true);
+	}
+}
+```
+
+이를 통해 실행해보면 아래와 같이 총을 쐈을 때 MaxRange라는 사거리 안에서 충돌한 위치를 리턴하는 것을 확인할 수 있다.
+![15](/Assets/Images/Unreal/실습/SimpleShooter/15.png)
