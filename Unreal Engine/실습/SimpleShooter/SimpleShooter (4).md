@@ -133,3 +133,107 @@ void AShooterAIController::BeginPlay()
 
 위에서 블랙보드의 있는 변수를 설정할 수 있고 이 변수를 사용하여 아래처럼 행동트리에서 AI를 구성할 수 있다.
 ![26](/Assets/Images/Unreal/실습/SimpleShooter/26.png)
+
+### BTTask 와 BTService
+
+#### BTTask
+
+BTTask는 C++ 코드로 원하는 기능을 구현하여 이를 블랙보드에서 사용할 노드로 만들어서 사용하는 방식을 뜻한다.
+
+구현부만 살펴보자면 아래처럼 노드 이름을 생성자에서 정해주고 ExecuteTask()나 TickTask() 등의 BTTask의 메소드를 상속받아서 실행할 동작을 구현하면 된다.
+
+BTTask_Shoot.cpp
+
+```C++
+UBTTask_Shoot::UBTTask_Shoot()
+{
+    NodeName = TEXT("Shoot");
+}
+
+EBTNodeResult::Type UBTTask_Shoot::ExecuteTask(UBehaviorTreeComponent &OwnerComp, uint8 *NodeMemory)
+{
+    Super::ExecuteTask(OwnerComp, NodeMemory);
+
+    if (OwnerComp.GetAIOwner() == nullptr)
+    {
+        return EBTNodeResult::Failed;
+    }
+    AShooterCharacter *Character = Cast<AShooterCharacter>(OwnerComp.GetAIOwner()->GetPawn());
+
+    if (Character == nullptr)
+    {
+        return EBTNodeResult::Failed;
+    }
+
+    Character->Shoot();
+    return EBTNodeResult::Succeeded;
+}
+```
+
+이를 블랙보드에서 활용하면 위에 코드에서 지은 노드네임을 바탕으로 노드를 배치하고 사용할 수 있는 모습을 볼 수 있다.
+
+![27](/Assets/Images/Unreal/실습/SimpleShooter/27.png)
+
+#### BTService
+
+BTService는 노드의 부착되어 사용되며 해당 노드가 실행되는 동안 반복해서 발동되는 기능을 뜻하며 이 BTService를 통해서 이를 C++로 구현할 수 있다.
+
+BTService의 예로 해당 서비스가 실행된 노드의 정보를 가져와서 활용하는 모습을 볼 수 있다.
+
+BTService_PlayerLocation.cpp
+
+```C++
+
+#include "BTService_PlayerLocation.h"
+#include "BehaviorTree/BlackboardComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFrameWork/Pawn.h"
+
+UBTService_PlayerLocation::UBTService_PlayerLocation()
+{
+    NodeName = "Update Player Location";
+}
+
+void UBTService_PlayerLocation::TickNode(UBehaviorTreeComponent &OwnerComp, uint8 *NodeMemory, float DeltaSeconds)
+{
+    Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
+
+    APawn *PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+    if (PlayerPawn == nullptr)
+    {
+        return;
+    }
+
+    OwnerComp.GetBlackboardComponent()->SetValueAsVector(GetSelectedBlackboardKey(), PlayerPawn->GetActorLocation());
+}
+```
+
+구현이 끝났으면 노드에 실제 부착해서 사용한다.
+
+![28](/Assets/Images/Unreal/실습/SimpleShooter/28.png)
+
+### 최종 완성된 블랙 보드
+
+![29](/Assets/Images/Unreal/실습/SimpleShooter/29.png)
+
+## 죽음에 따른 처리
+
+플레이어나 적이 죽어도 총이 계속 발사되는 현상을 볼 수 있는데 이를 막기 위해 체력이 0이 되면 Controller를 제거하고 Collision을 꺼주는 작업을 진행했다. 이를 통해서 시체만 남는 것을 확인할 수 있다.
+
+```C++
+float AShooterCharacter::TakeDamage(float DamageAmount, struct FDamageEvent const &DamageEvent, class AController *EventInstigator, AActor *DamageCauser)
+{
+	float DamageToApply = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	DamageToApply = FMath::Min(Health, DamageToApply);
+	Health -= DamageToApply;
+
+	// 죽으면 Controller제거하고 Collision도 제거
+	if (IsDead())
+	{
+		DetachFromControllerPendingDestroy();
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	return DamageToApply;
+}
+```
