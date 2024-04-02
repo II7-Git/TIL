@@ -142,3 +142,65 @@ void APlatformTrigger::OnOverlapEnd(class UPrimitiveComponent *OverlappedComp, c
 #### GameInstance
 
 [GameInstance 정리](/Unreal%20Engine/이론%20및%20정리/GameInstance.md)
+
+### Travel을 통한 이동
+
+#### ServerTravel
+
+ServerTravel을 월드에서 실행하는 기능으로 현재 월드에 연결된 컨트롤러들의 연결을 끊기지 않고 임의의 링크로 지정한 다른 레벨로 전부 이동시키는 기능을 하는 메소드이다.
+
+사용 예는 아래의 코드와 같으며 월드에서 실행하는 기능이므로 UWorld의 정보를 가져와서 실행하게 된다.
+
+이떄 아래 ServerTravel을 보면 링크 끝에 '?listen'을 볼 수 있는데 이는 링크에 대한 옵션으로 서버 옵션에서 listen server로 레벨을 가동한다는 뜻으로 이를 통해서 서버의 역할로 실행하게 된다.
+
+```C++
+
+void UPuzzlePlatformsGameInstance::Host()
+{
+    UEngine *Engine = GetEngine();
+
+    if (Engine == nullptr)
+        return;
+
+    Engine->AddOnScreenDebugMessage(0, 10, FColor::Green, TEXT("Hosting"));
+
+    UWorld *World = GetWorld();
+
+    if (World == nullptr)
+        return;
+
+    World->ServerTravel("/Game/ThirdPerson/Maps/ThirdPersonMap?listen");
+}
+```
+
+#### ClientTravel
+
+ClientTravel은 말 그대로 클라이언트가 실행하는 레벨 이동으로 각 Controller에서 실행해서 해당 Controller를 가진 Client만이 링크의 레벨로 이동하게 된다.
+
+코드 예) (Address는 서버에 IP 주소가 들어간다)<br>
+각 클라이언트에서 Controller를 얻어와서 Controller에서 Travel을 시도하는 것을 볼 수 있다.
+
+```C++
+void UPuzzlePlatformsGameInstance::Join(const FString &Address)
+{
+    UEngine *Engine = GetEngine();
+
+    if (Engine == nullptr)
+        return;
+
+    Engine->AddOnScreenDebugMessage(0, 20, FColor::Green, FString::Printf(TEXT("Joining %s"), *Address));
+
+    APlayerController *PlayerController = GetFirstLocalPlayerController();
+
+    if (PlayerController == nullptr)
+        return;
+
+    PlayerController->ClientTravel(Address, ETravelType::TRAVEL_Absolute);
+}
+```
+
+---
+
+이를 통해서 서버에서는 호스팅 기능을 클라이언트는 해당 서버에 접속하는 기능을 수행하게 되고 그 결과를 아래 사진으로 확인했다.
+
+![9](/Assets/Images/Unreal/실습/PuzzlePlatforms/9.png)
