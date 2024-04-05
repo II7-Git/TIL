@@ -45,3 +45,44 @@ UPuzzlePlatformsGameInstance::UPuzzlePlatformsGameInstance(const FObjectInitiali
 
 이를 통해서 얻어낸 MenuBPClass의 이름을 확인해보면 제대로 찾아냈다는 것을 알아낼 수 있다.
 ![11](/Assets/Images/Unreal/실습/PuzzlePlatforms/11.png)
+
+### UI에 대한 인풋 활성화
+
+UI 위젯을 화면에 소환하더라도 마우스 커서가 없고 위젯에 입력을 할 수 도 없는 상태로 존재한다 이를 해결하기 위해서는 플레이어 컨트롤러의 인풋 모드에서 해당 위젯에 대한 인풋 모드를 활성화 시켜주어야한다.
+
+이를 위한 코드는 아래와 같다.
+
+코드를 보면 UI 위젯을 소환하고 해당 위젯에 대한 FInputModeUIOnly를 만들어 필요한 옵션을 세팅해주고 PlayerController에서 SetInputMode에 만든 인풋 모드를 설정함으로써 UI를 조작할 수 있게 해준다. 또 PlayerController에게 있는 bShowMouseCursor를 통해서 마우스를 보이도록하여 조작할 수 있게 한다.
+
+```C++
+void UPuzzlePlatformsGameInstance::LoadMenu()
+{
+    if (MenuClass == nullptr)
+        return;
+    UUserWidget *Menu = CreateWidget<UUserWidget>(this, MenuClass);
+
+    if (Menu == nullptr)
+        return;
+
+    Menu->AddToViewport();
+
+    APlayerController *PlayerController = GetFirstLocalPlayerController();
+    if (PlayerController == nullptr)
+        return;
+
+    // UI 입력 가능하게 설정하는 기능
+
+    // UI인풋에 관한 모드를 생성함
+    FInputModeUIOnly InputModeData;
+    // 조작하고자 하는 위젯의 포커스를 둠
+    InputModeData.SetWidgetToFocus(Menu->TakeWidget());
+    // 마우스가 화면에 잠기지 않게 설정(화면 밖으로 이동하거나 하는 것이 가능)
+    InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+
+    // 만든 인풋 모드로 컨트롤러의 인풋 모드를 변경
+    PlayerController->SetInputMode(InputModeData);
+
+    // 커서 보이기
+    PlayerController->bShowMouseCursor = true;
+}
+```
