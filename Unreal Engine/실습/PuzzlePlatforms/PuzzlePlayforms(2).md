@@ -86,3 +86,180 @@ void UPuzzlePlatformsGameInstance::LoadMenu()
     PlayerController->bShowMouseCursor = true;
 }
 ```
+
+### BindWidget을 통한 Widget C++연결하기
+
+Widget에 하위 위젯을 C++에서 연결하는 방법이 있는데 UPROPERTY(meta = (BindWidget))이다.
+
+이를 통해서 같은 타입의 클래스가 Widget에 하위 속성으로 있고 그 이름이 변수명과 같다면 해당 Widget변수에 바인딩 된다.
+
+```C++
+UCLASS()
+class PUZZLEPLATFORMS_API UMainMenu : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	void SetMenuInterface(IMenuInterface *InstanceMenuInterface);
+
+protected:
+	virtual bool Initialize();
+
+private:
+	// BindWidget : 해당 서브 위젯과 변수의 이름을 바탕으로 자동으로 매칭해서 바인딩 해주는 옵션(따라서 Button 서브 위젯의 이름도 Host여야 같은 UButton Host변수에 매칭된다.)
+	UPROPERTY(meta = (BindWidget))
+	class UButton *Host;
+
+	UPROPERTY(meta = (BindWidget))
+	class UButton *Join;
+
+	UFUNCTION()
+	void HostServer();
+
+	UFUNCTION()
+	void JoinServer();
+
+	IMenuInterface *MenuInterface;
+};
+```
+
+이를 통해서 Host와 Join에 메뉴 블루프린트에서 만든 버튼들이 매칭됐기에 이를 델리게이트에 등록해서 콜백 함수로 만들어준다.
+
+이 때 사용된 메소드는 OnClicked.AddDynamic()이다.
+
+```C++
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#include "MainMenu.h"
+#include "Components/Button.h"
+
+bool UMainMenu::Initialize()
+{
+    bool Success = Super::Initialize();
+
+    if (!Success)
+        return false;
+
+    // TODO: Setup
+    if (Host == nullptr || Join == nullptr)
+        return false;
+
+    Host->OnClicked.AddDynamic(this, &UMainMenu::HostServer);
+    Join->OnClicked.AddDynamic(this, &UMainMenu::JoinServer);
+
+    return true;
+}
+```
+
+### Interface를 통한 의존성 주입
+
+만들어놓은 메뉴는 게임 인스턴스와는 독립된 시스템으로 존재하게 하는 것이 생산성이나 재활용성에서 훨씬 효율적이다. 그렇기에 메뉴 시스템이 게임에 종속되지 않도록 하는 것이 이상적인 구조인데 이를 위해서는 둘을 각각의 클래스로 만들고 의존성 주입을 통해서 동작이 되도록 하는 구조로 만들고자 한다.
+
+MenuWidget에서는 여러 게임 Instance에서 사용가능하게 하기 위해서 의존성 주입을 하는 방법으로 Interface를 사용하게 된다.
+
+Interface에서 Widget이 사용하고자 하는 메소드들을 순수 가상 함수로 선언하고 이 Interface를 상속받은 GameInstance에서 의존성 주입을 Widget에게 의존성을 주입해주면 서로 독립적인 시스템을 만들 수 있다. 이를 코드로 보면 아래와 같다.
+
+-MainMenu-<br>
+Main Menu에서는 아래와 같이 Widget에서 사용될 다른 클래스의 기능을 Interface의 메소드를 통해서만 동작시키게 된다.
+
+```C++
+// MainMenu.h
+#include "MenuInterface.h"
+#include "MainMenu.generated.h"
+
+UCLASS()
+class PUZZLEPLATFORMS_API UMainMenu : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	void SetMenuInterface(IMenuInterface *InstanceMenuInterface);
+
+private:
+	IMenuInterface *MenuInterface;
+};
+
+
+// MainMenu.cpp
+void UMainMenu::SetMenuInterface(IMenuInterface *InstanceMenuInterface)
+{
+    this->MenuInterface = InstanceMenuInterface;
+}
+
+void UMainMenu::HostServer()
+{
+    UE_LOG(LogTemp, Warning, TEXT("Hosting Now!!"));
+    if (MenuInterface != nullptr)
+    {
+        MenuInterface->Host();
+    }
+}
+```
+
+-MenuInterface-<br>
+메뉴 인터페이스에서는 아래처럼 사용하고자하는 메소드를 순수 가상 함수로써 선언만 해놓는다.
+
+```C++
+#pragma once
+
+#include "CoreMinimal.h"
+#include "UObject/Interface.h"
+#include "MenuInterface.generated.h"
+
+// This class does not need to be modified.
+UINTERFACE(MinimalAPI)
+class UMenuInterface : public UInterface
+{
+	GENERATED_BODY()
+};
+
+/**
+ *
+ */
+class PUZZLEPLATFORMS_API IMenuInterface
+{
+	GENERATED_BODY()
+
+	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
+public:
+	// 구현은 상속받은 곳에서 하면 된다는 뜻 =0
+	virtual void Host() = 0;
+};
+```
+
+-PuzzlePlatformsGameInstance-<br>
+기존에 만들어뒀던 게임 인스턴스에 상속 부분을 보면 public IMenuInterface를 상속받은 것을 볼 수 있는데 그곳에 있던 Host를 Override하여서 현재 Host의 기능이 Menu에서 Interface를 통해서 동작할 수 있게 됐다.
+
+또 중요한 것으로는 cpp에서 종속성 주입을 하여서 Menu에서 현재 이 게임 인스턴스를 Menu에서 조작할 instance임을 알려주는 의존성 반전을 구현하는 것임을 이해해야 한다.
+
+```C++
+UCLASS()
+class PUZZLEPLATFORMS_API UPuzzlePlatformsGameInstance : public UGameInstance, public IMenuInterface
+{
+	GENERATED_BODY()
+
+public:
+	UFUNCTION(Exec)
+	void Host();
+
+};
+
+// CPP
+
+void UPuzzlePlatformsGameInstance::LoadMenu()
+{
+    if (MenuClass == nullptr)
+        return;
+    UMainMenu *Menu = CreateWidget<UMainMenu>(this, MenuClass);
+
+    if (Menu == nullptr)
+        return;
+
+    Menu->AddToViewport();
+
+    // 종속성 주입
+    Menu->SetMenuInterface(this);
+}
+```
+
+이를 통해서 인터페이스를 통한 의존성 반전과 종속성 주입을 통해서 각 클래스를 독립적으로 운용할 수 있게 되는 점을 이해하는 것이 중요하다.
