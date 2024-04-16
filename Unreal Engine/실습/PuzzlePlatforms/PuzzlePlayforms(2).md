@@ -263,3 +263,37 @@ void UPuzzlePlatformsGameInstance::LoadMenu()
 ```
 
 이를 통해서 인터페이스를 통한 의존성 반전과 종속성 주입을 통해서 각 클래스를 독립적으로 운용할 수 있게 되는 점을 이해하는 것이 중요하다.
+
+### MenuSwitcher를 통한 Widget변경
+
+이전에 사용했던 binding기능을 사용해서 MenuSwitcher를 가져온 뒤 C++ 코드에서 버튼을 클릭시 원하는 위젯으로 변경하는 코드를 구성했다.
+
+다른 부분은 빼고 MenuSwicher에서 SetActiveWidget()을 통해서 다른 위젯으로 변경하는 코드는 아래와 같다.
+
+```C++
+void UMainMenu::OpenJoinMenu()
+{
+    if (JoinMenu == nullptr)
+        return;
+
+    MenuSwitcher->SetActiveWidget(JoinMenu);
+}
+```
+
+### TextField에 입력값으로 서버에 Join하기
+
+TextField에서 GetText()를 통해서 해당 값을 가져와서 접속을 시도한다. 전체적인 다른 구조는 이전에 Host()기능 구현과 비슷하기에 이 부분에 대해서는 생략한다.
+
+```C++
+void UMainMenu::JoinServer()
+{
+    if (MenuInterface != nullptr)
+    {
+        if (IPAddressField == nullptr)
+            return;
+
+        const FString &Address = IPAddressField->GetText().ToString();
+        MenuInterface->Join(Address);
+    }
+}
+```
