@@ -297,3 +297,58 @@ void UMainMenu::JoinServer()
     }
 }
 ```
+
+### 서버에서 나가기 기능
+
+인게임에서 특정 플레이어가 종료하고 나가는 경우에는 해당 플레이어 컨트롤러만 이동해야하기에 ClientTravle를 사용해서 구현헀다.
+
+InGameMenu 에서 quit 버튼을 눌러서 게임 종료 지시
+
+```C++
+void UInGameMenu::QuitPressed()
+{
+    if (MenuInterface != nullptr)
+    {
+        Teardown();
+        MenuInterface->LoadMainMenu();
+    }
+}
+```
+
+게임 인스턴스에서는 해당 플레이어 컨트롤러를 찾아 ClientTravel로 MainMenu로 이동
+
+```C++
+void UPuzzlePlatformsGameInstance::LoadMainMenu()
+{
+
+    APlayerController *PlayerController = GetFirstLocalPlayerController();
+
+    if (PlayerController == nullptr)
+        return;
+
+    PlayerController->ClientTravel("/Game/MenuSystem/MainMenu", ETravelType::TRAVEL_Absolute);
+}
+
+```
+
+### 게임 종료
+
+게임 클라이언트 자체를 종료시키는 방법은 여러가지가 있으나 이번에 사용한 방식은 플레이어 컨트롤러에서 ConsoleCommand()에 quit 명령어를 입력하는 기능을 나가기 버튼에 넣어서 구현하는 방식이었다.
+
+종료 버튼을 누르면 플레이어 컨트롤러에서 quit 명령어를 입력하는 방식이다.
+
+```C++
+
+void UMainMenu::QuitPressed()
+{
+
+    UWorld *World = GetWorld();
+    if (World == nullptr)
+        return;
+    APlayerController *PlayerController = World->GetFirstPlayerController();
+    if (PlayerController == nullptr)
+        return;
+
+    PlayerController->ConsoleCommand("quit");
+}
+```
