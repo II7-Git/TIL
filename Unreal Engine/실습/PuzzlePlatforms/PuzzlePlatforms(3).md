@@ -155,3 +155,91 @@ Host를 종료하면 세션 사라진 것을 확인했다.
 
 로그를 통해서 마찬가지로 확인 가능했다.
 ![18](/Assets/Images/Unreal/실습/PuzzlePlatforms/18.png)
+
+### Session Join 기능을 리스트에서 선택한 정보를 통해서 구현
+
+기존에 구현했던 Session Join 방식을 클릭한 세션 정보를 통해서 접속을 시도하는 구조로 만들어 방을 통한 접속 기능을 구현하고자 했다. 세션의 접속하고서 진행돼야 하는 후속 처리는 OnlineSession의 기능인 OnJoinSessionComplete에 비동기 함수로 등록해서 진행해줬다.
+
+MainMenu에서 JoinServer 버튼을 누르면 GameInstance에 Join기능을 실행한다. 이때 SelectedIndex에는 내가 클릭한 세션의 Index 값이 들어가서 전해진다.
+
+```C++
+void UMainMenu::JoinServer()
+{
+    if (SelectedIndex.IsSet() && MenuInterface != nullptr)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Selected index %d"), SelectedIndex.GetValue());
+        MenuInterface->Join(SelectedIndex.GetValue());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Selected index not set."));
+    }
+}
+
+```
+
+GameInstance에 Join 구현을 보면 받은 Index를 통해서 생성된 세션 중 Index위치의 세션에 대해 접속을 시도한다.
+
+```C++
+void UPuzzlePlatformsGameInstance::Join(uint32 Index)
+{
+    if (!SessionInterface.IsValid())
+        return;
+
+    if (!SessionSearch.IsValid())
+        return;
+
+    if (Menu != nullptr)
+    {
+        // Menu->SetServerList({});
+        Menu->Teardown();
+    }
+
+    SessionInterface->JoinSession(0, SESSION_NAME, SessionSearch->SearchResults[Index]);
+}
+```
+
+세션 접속이 성공했다면 아래의 코드를 통해 세션 접속이 성공했을시 발동되는 비동기 함수를 동작시킨다.
+
+```C++
+SessionInterface->OnJoinSessionCompleteDelegates.AddUObject(this, &UPuzzlePlatformsGameInstance::OnJoinSessionComplete);
+```
+
+비동기 함수에서는 세션 접속 성공 시 실행돼야할 후속 처리를 진행한다. 여기서는 세션에 대한 정보를 가져와서 이를 통해서 세션에 대한 Address를 얻어와서 ClientTravel을 통해서 실제 레벨 이동을 하여서 Join한 플레이어가 로비에서 벗어나 플레이어들이 같은 레벨에서 만날 수 있게 동작시킨다.
+
+```C++
+void UPuzzlePlatformsGameInstance::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
+{
+    if (!SessionInterface.IsValid())
+        return;
+
+    FString Address;
+    if (!SessionInterface->GetResolvedConnectString(SessionName, Address))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Could not get connect String"));
+        return;
+    }
+
+    UEngine *Engine = GetEngine();
+    if (Engine == nullptr)
+        return;
+
+    Engine->AddOnScreenDebugMessage(0, 20, FColor::Green, FString::Printf(TEXT("Joining %s"), *Address));
+
+    APlayerController *PlayerController = GetFirstLocalPlayerController();
+
+    if (PlayerController == nullptr)
+        return;
+
+    PlayerController->ClientTravel(Address, ETravelType::TRAVEL_Absolute);
+}
+
+```
+
+이를 통해서 최종 구현된 모습
+
+왼쪽에서 방 정보 확인
+![19](/Assets/Images/Unreal/실습/PuzzlePlatforms/19.png)
+
+이를 클릭하면 실제 접속 확인
+![20](/Assets/Images/Unreal/실습/PuzzlePlatforms/20.png)
