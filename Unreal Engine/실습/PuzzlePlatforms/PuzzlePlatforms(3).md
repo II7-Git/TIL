@@ -243,3 +243,54 @@ void UPuzzlePlatformsGameInstance::OnJoinSessionComplete(FName SessionName, EOnJ
 
 이를 클릭하면 실제 접속 확인
 ![20](/Assets/Images/Unreal/실습/PuzzlePlatforms/20.png)
+
+### SteamOSS 활성화 및 연결
+
+OnlineSubSystem(OSS)로 스팀을 이용하여 스팀 서버를 통해서 연결하는 방법을 구현하려한다.
+
+Build.cs 에는 "OnlineSubsystemSteam" 모듈을 추가해준다.
+
+```C++
+PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "HeadMountedDisplay", "EnhancedInput","UMG" ,"OnlineSubsystem","OnlineSubsystemSteam"});
+```
+
+프로젝트 폴더로 가서 DefaultEngine.ini에 아래 설정을 하단에 추가해준다.
+
+DefaultEngine.ini
+
+```
+
+	[/Script/Engine.GameEngine]
+	+NetDriverDefinitions=(DefName="GameNetDriver",DriverClassName="OnlineSubsystemSteam.SteamNetDriver",DriverClassNameFallback="OnlineSubsystemUtils.IpNetDriver")
+
+	[OnlineSubsystem]
+	DefaultPlatformService=Steam
+
+	[OnlineSubsystemSteam]
+	bEnabled=true
+	SteamDevAppId=480
+
+	; If using Sessions
+	; bInitServerOnClient=true
+
+	[/Script/OnlineSubsystemSteam.SteamNetDriver]
+	NetConnectionClassName="OnlineSubsystemSteam.SteamNetConnection"
+```
+
+이를 통해 사용할 준비는 끝났고 실제 세션 연결 부분에서 약간의 설정을 해준다.
+
+세션을 만들어주는 CreateSession 부분에서는 스팀의 로비 기능을 사용하기 위해 bUsesPresence 옵션을 켜준다.
+
+```C++
+SessionSettings.bUsesPresence = true;
+```
+
+세션을 찾는 부분에서는 쿼리 세팅을 통해서 PRESENCE를 통해서 스팀 로비를 통해 찾는 옵션을 세팅해준다.
+
+```C++
+
+SessionSearch->MaxSearchResults = 100;
+SessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
+```
+
+위 과정을 통해서 OSS가 스팀을 통해서 세션을 찾을 수 있게 된다.
