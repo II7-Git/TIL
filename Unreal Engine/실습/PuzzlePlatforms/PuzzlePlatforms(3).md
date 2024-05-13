@@ -294,3 +294,44 @@ SessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equ
 ```
 
 위 과정을 통해서 OSS가 스팀을 통해서 세션을 찾을 수 있게 된다.
+
+### 서버 Join UI 다듬기
+
+서버 리스트에서 어떠한 세션을 선택했는지 애매한 부분이 있기에 이를 클릭한 서버의 글씨색을 바꾸어서 유저가 구분하기 편하게 설정하였다.
+
+![21](/Assets/Images/Unreal/실습/PuzzlePlatforms/21.png)
+
+기존에는 세션의 이름만 나타나고 다른 정보는 확인할 수 없었다. 이를 바꾸기 위해 SessionResult에서 가져올 수 있는 정보들을 바탕으로 구조체를 만들어서 추가적인 세션에 정보를 띄우기로 하였다.
+
+세션창에 띄울 정보들을 구조체로 만들었다.
+
+```C++
+USTRUCT()
+struct FServerData
+{
+	GENERATED_BODY()
+
+	FString Name;
+	uint16 CurrentPlayers;
+	uint16 MaxPlayers;
+	FString HostUsername;
+};
+```
+
+게임 인스턴스에서 세션에서 얻은 FOnlineSessionSearchResult의 정보들로 필요한 구조체 정보들을 채워서 서버 리스트에 추가하였다.
+
+```C++
+for (const FOnlineSessionSearchResult &SearchResult : SessionSearch->SearchResults)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Found session names: %s"), *SearchResult.GetSessionIdStr());
+            FServerData Data;
+            Data.Name = SearchResult.GetSessionIdStr();
+            Data.MaxPlayers = SearchResult.Session.SessionSettings.NumPublicConnections;
+            Data.CurrentPlayers = Data.MaxPlayers - SearchResult.Session.NumOpenPublicConnections;
+            Data.HostUsername = SearchResult.Session.OwningUserName;
+            ServerNames.Add(Data);
+        }
+```
+
+이를 통해서 각종 정보를 세션 리스트에서 확인이 가능해졌다.
+![22](/Assets/Images/Unreal/실습/PuzzlePlatforms/22.png)
