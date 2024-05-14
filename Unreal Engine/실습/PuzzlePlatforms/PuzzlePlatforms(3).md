@@ -335,3 +335,39 @@ for (const FOnlineSessionSearchResult &SearchResult : SessionSearch->SearchResul
 
 이를 통해서 각종 정보를 세션 리스트에서 확인이 가능해졌다.
 ![22](/Assets/Images/Unreal/실습/PuzzlePlatforms/22.png)
+
+### 방 제목 설정
+
+FOnlineSessionSettings에 Set 함수를 통해서 특정 원하는 변수를 전달하는 것이 가능하다 Key값을 맞춰주고 원하는 정보를 넘겨서 이를 같은 세션 정보에서 Get()을 통해 가져오면 원하는 정보를 세션을 통해서 주고 받는 것이 가능하다. 이를 이용해서 방 제목 설정을 진행해보았다.
+
+가장 중요한 부분만 보면 SessionSettings.Set(FName Key, const FString &Value, EOnlineDataAdvertisementType::Type InType) 부분으로 임의의 설정한 Key값과 전해줄 Value를 설정하여 세션에 저장한다.
+
+```C++
+SessionSettings.Set(SERVER_NAME_SETTING_KEY, DesiredServerName, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+```
+
+그러고 난 뒤 세션을 얻은 부분에서는 Get(FName Key, FString &Value)을 통해서 Key를 통해서 값을 찾고 Value에 참조 연산으로 저장한다.
+
+```C++
+FString ServerName;
+            if (SearchResult.Session.SessionSettings.Get(SERVER_NAME_SETTING_KEY, ServerName))
+            {
+                // UE_LOG(LogTemp, Warning, TEXT("Data Found in Settings: %s"), *ServerName);
+                Data.Name = ServerName;
+            }
+            else
+            {
+                // UE_LOG(LogTemp, Warning, TEXT("Didnt get expected Data"));
+                Data.Name = "Could not find name";
+            }
+```
+
+이를 통해서 방 제목을 Host할 때 설정하고 Find할 때 해당 방 제목을 보는 것이 가능하다.
+
+방 제목을 설정하는 장면
+
+![23](/Assets/Images/Unreal/실습/PuzzlePlatforms/23.png)
+
+해당 방 제목을 확인 가능하다.
+
+![24](/Assets/Images/Unreal/실습/PuzzlePlatforms/24.png)
