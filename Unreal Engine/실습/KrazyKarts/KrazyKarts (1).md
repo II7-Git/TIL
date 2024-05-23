@@ -2,6 +2,8 @@
 
 ## 카트 이동 구현
 
+### 카트의 전진 구현
+
 기존에 단순히 입력값에 따른 이동 구현은 자동차에 움직임과는 괴리감이 있기에 힘을 계속해서 가해주어서 가속도를 얻어서 이를 통해서 이동 속도에 따른 이동처리를 하게끔 변경했다.<br>
 그렇기에 입력값에 따른 가속도를 구해서 이를 바탕으로 질량\*가속도를 해서 이동을 구현했다.
 
@@ -24,7 +26,7 @@ Velocity = Velocity + Acceleration * DeltaTime;
 코드는 아래와 같고 이동 벡터는 속도와 시간을 곱해서 구하고 이를
 AddActorWorldOffset(Translation, true, &Hit) 의 인자로 써서 이동 시킨다.
 
-이때 true 옵션은 해당 위치로 이동하기 전에 미리 위치로 이동가능한지 체크하는 Sweep 옵션을 킨다는 뜻이고 이를 통해 콜리전 충돌여부를 따져서 이동 불가한 위치면 가지 않게 설정한다. Hit은 FHitResult로 이 곳에 Sweep에서 따진 충돌 결과를 외부 변수 Hit에 저장하게 된다.<br>
+이때 true 옵션은 해당 위치로 이동하기 전에 미리 위치로 이동가능한지 체크하는 Sweep 옵션을 킨다는 뜻이고 이를 통해 콜리전 충돌여부를 따져서 이동 불가한 위치면 가지 않게 설정한다. Hit은 FHitResult 의 포인터로 이 곳에 Sweep에서 따진 충돌 결과를 외부 변수 Hit에 저장하게 된다. 포인터이기에 만약 필요없다면 null로 넘길 수 있다<br>
 
 만약 Hit.IsValidBlockingHit()을 통해 차가 무언가 충돌해 차가 정지했다면 이동 속도를 0으로 만들어주어서 다음 이동에 영향을 주지 않게끔 설정했다.
 
@@ -41,4 +43,61 @@ void AGoKart::UpdateLocationFromVelocity(float DeltaTime)
 		Velocity = FVector::ZeroVector;
 	}
 }
+```
+
+### 카트의 회전 구현
+
+회전을 시키는 방법으로 기존에는 FRotator를 많이 썼지만 이번에는 FQuat을 사용했다.
+
+FQuat의 장점은 특정 축(벡터)와 그 축을 기준으로 회전하려는 각도만으로 회전을 시킬 수 있다는 점과 그렇기에 X,Y,Z를 통한 고정 위치에 따른 회전이 아닌 자유로운 회전이 가능하다는 점에 있다.
+
+참고 : [FQuat DOCS](https://docs.unrealengine.com/4.26/en-US/API/Runtime/Core/Math/FQuat/)
+
+이를 통해서 회전을 구하여 AddActorWorldRotation()을 통해서 회전을 적용시켜준다.<br>
+이때 회전하는 만큼 속도 벡터도 방향을 회전시켜야 차의 전진방향과 회전방향을 일치시킬 수 있게된다.
+
+그에 따라 구현한 코드는 아래와 같다.
+
+```C++
+void AGoKart::ApplyRotation(float DeltaTime)
+{
+	// 회전 적용
+	float RotationAngle = MaxDegreesPerSecond * DeltaTime * SteeringThrow;
+	// FRotator로는 못하는 여러 축에 따른 회전이 가능
+	// 현재 액터의 업 벡터에서 라디안 만큼 회전
+	// 따라서 RotationAngle을 라디안으로 변환
+	FQuat RotationDelta(GetActorUpVector(), FMath::DegreesToRadians(RotationAngle));
+
+	// 현재 전진하는 벡터를 회전하는 FQuat만큼 회전시켜서 회전각도와 자동차의 전진 각도가 일치하게 하여 이동에 어색함을 없게끔한다.
+	Velocity = RotationDelta.RotateVector(Velocity);
+
+	AddActorWorldRotation(RotationDelta);
+}
+```
+
+### 카트의 최대 속도와 공기 저항
+
+자동차의 최대 속도가 존재하는 이유는 자동차의 속력에 따라 받게 되는 공기 저항이 커지기 때문이다.
+
+공기 저항식은 아래와 같다. 아래에서 확인할 수 있든 속력의 제곱에 비례하여 공기저항이 커지기 때문에 이 값이 속도와 반대로 적용되서 맞부딪혀 가속도가 0이 되는 순간 더 이상 속력을 올릴 수 없는 최대 속도가 되게된다.<br>DragCoefficient는 저항계수를 뜻하는데 차체의 설계 등에 따라서 바뀔 수 있는 값으로 차체의 설계는 이 값을 줄이기 위해 설계한다고 생각하면 편하다.
+
+```
+AirResistance = - Speed² * DragCoefficient
+```
+
+위 식을 적용해서 실질적으로 저항을 얻으면 아래와 같다.
+
+```C++
+Fvector AGoKart::GetResistance()
+{
+	return -Velocity.GetSafeNormal() * Velocity.SizeSquared() * DragCoefficient;
+}
+
+```
+
+위의 값을 공기 저항으로 적용시켜준다.
+
+```C++
+// 공기 저항 적용
+Force += GetResistance();
 ```
