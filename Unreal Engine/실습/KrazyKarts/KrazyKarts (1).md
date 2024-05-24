@@ -101,3 +101,66 @@ Fvector AGoKart::GetResistance()
 // 공기 저항 적용
 Force += GetResistance();
 ```
+
+### 구름 저항(Rolling Resistance)
+
+구름 저항은 바퀴같은 구르는 물체에 적용되는 저항으로 이를 통해서 공기 저항만으로는 쉽게 멈추지 않는 자동차에 저항을 줘서 좀 더 자연스러운 감속을 구현하려고 한다.
+
+구름 저항식은 아래와 같은데 NormalForce는 중력에 대해서 작용 반작용으로 땅이 밀어올리는 힘을 뜻한다. 따라서 중력이 강해질수록 NormalForce도 강해지게 된다.
+
+```
+RollingResistance= RRCoefficient x NormalForce
+```
+
+이를 통해 구름 저항을 적용시키는 코드는 아래와 같다
+
+```C++
+FVector AGoKart::GetRollingResistance()
+{
+	// 월드에 설정된 중력값 알아내기
+	float AccelerationDueToGravity = -GetWorld()->GetGravityZ() / 100;
+	// 중력에 대항하는 NormalForce 계산 // NormalForce= M(질량)*G(중력)
+	float NormalForce = Mass * AccelerationDueToGravity;
+	return -Velocity.GetSafeNormal() * RollingResistanceCoefficient * NormalForce;
+}
+```
+
+### Steering 설정
+
+현재 상태는 차가 멈춰있어도 회전이 가능한 실제 차 움직임과는 괴리가 있는 상태이다. 이를 차의 회전 반경에 맞춰서 회전하는 Steering을 구현해서 움직임을 바꾸려고 한다.
+
+차의 회전 반경을 일정한 축을 기준으로 정해진 반지름만큼의 거리를 두고 회전하는 원의 형태를 가지기에 이를 코드에 적용시켜 속도에 맞춰서 차가 회전 반경에 따라서 회전하는 모습을 구현할 수 있다. 그 코드를 구현하면 아래와 같다.
+
+```C++
+// 회전 반경을 고려한 회전 구현
+void AGoKart::ApplyRotation(float DeltaTime)
+{
+
+	// 속력에 시간을 곱해서 이동 거리 계산
+	// 속도 벡터와 액터의 전방 벡터를 내적하여 후진할 때 상황에도 대응할 수 있는 속력값 얻어내기
+	// EX ) 전진이라면 +, 후진이라면 -값을 리턴하게된다.
+	float DeltaLocation = FVector::DotProduct(GetActorForwardVector(), Velocity) * DeltaTime;
+	// 실제 회전 각도 = 이동 거리/회전 반경*핸들의 회전각도
+	float RotationAngle = DeltaLocation / MinTurningRadius * SteeringThrow;
+	// FRotator로는 못하는 여러 축에 따른 회전이 가능
+	// 현재 액터의 업 벡터에서 라디안 만큼 회전
+	FQuat RotationDelta(GetActorUpVector(), RotationAngle);
+
+	// 현재 전진하는 벡터를 회전하는 FQuat만큼 회전시켜서 회전각도와 자동차의 전진 각도가 일치하게 하여 이동에 어색함을 없게끔한다.
+	Velocity = RotationDelta.RotateVector(Velocity);
+
+	AddActorWorldRotation(RotationDelta);
+}
+```
+
+위 코드를 보게 되면 DeltaLocation은 차가 이동하는 거리인데 뒤로 가는 후진 상황에도 대응하기 위해 단순 속력이 아닌 전방 벡터와 속도의 내적으로 스칼라 값을 얻고 이에 시간을 곱해주는 것이 중요한 점이다. 이렇게 하여 후진 상황에는 -값, 전진에는 +값을 얻어서 올바르게 처리가 가능해진다.<br>
+
+다음 회전 각도(Rotation Angle)는 아래의 식을 이용하면 구할 수 있다.
+
+```
+원에서 이동 거리= 각도*반지름
+```
+
+이를 활용해서 DeltaLocation/MinTurningRadius(회전 반경의 반지름)\*SteeringThrow(핸들 방향) 을 해주게 된다면 실제로 차가 바퀴 축에 따라서 속도에 맞춰서 회전해야하는 각도를 얻을 수 있게 된다. 그래서 결국 자연스러운 회전 움직임을 얻어낼 수 있다.
+
+
