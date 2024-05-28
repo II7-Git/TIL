@@ -163,4 +163,24 @@ void AGoKart::ApplyRotation(float DeltaTime)
 
 이를 활용해서 DeltaLocation/MinTurningRadius(회전 반경의 반지름)\*SteeringThrow(핸들 방향) 을 해주게 된다면 실제로 차가 바퀴 축에 따라서 속도에 맞춰서 회전해야하는 각도를 얻을 수 있게 된다. 그래서 결국 자연스러운 회전 움직임을 얻어낼 수 있다.
 
+## 서버-클라이언트 Unreal RPC
 
+서버-클라이언트 구조에서 서버 측에서 클라이언트에 조작에 따른 요청을 받고 처리해서 다시 반영하기 위해서는 통신을 위한 특별한 함수를 사용해야 하는데 이것이 RPC이다 이에 대해서 자세한 기능 정리는 아래 링크에 해놓았다.
+
+#### [Unreal RPC](/Unreal%20Engine/이론%20및%20정리/멀티플레이/Unreal%20RPC.md)
+
+이에 따른 구현 부분은 아래와 같고 \_Implementation 키워드와 \_Validate를 각각 구현한 것을 확인할 수 있다.
+
+```C++
+void AGoKart::Server_MoveForward_Implementation(float Value)
+{
+	Throttle = Value;
+	// Velocity = GetActorForwardVector() * 20 * Value;
+}
+
+// MoveForward의 유효성 검증으로 치트 방지
+bool AGoKart::Server_MoveForward_Validate(float Value)
+{
+	return FMath::Abs(Value) <= 1;
+}
+```
