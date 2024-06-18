@@ -79,3 +79,113 @@ void UGoKartMovementReplicator::ClientTick(float DeltaTime)
 
 	GetOwner()->SetActorRotation(NewRotation);
 ```
+
+## Replicator의 ClientTick 리팩토링
+
+ClientTick에서 다양한 보간계산을 전체적으로 하다보니 하나의 함수가 규모가 너무 커져서 이를 리팩토링해서 코드를 깔끔하게 정리했다.
+
+먼저 보간에서 쓰일 정보들을 구조체로 만들어서 관리하기로 했고 이를 헤더 파일에 정의해놓았다.
+
+<code>StartLocation, StartDerivative, TargetLocation, TargetDerivative</code> 보간에서 쓰였던 4개의 변수와 이를 통해 구현하는 FMath 함수를 구조체의 넣어서 구성했다.
+
+```C++
+struct FHermiteCubicSpline
+{
+	FVector StartLocation, StartDerivative, TargetLocation, TargetDerivative;
+
+	FVector InterpolateLocation(float LerpRatio) const
+	{
+		return FMath::CubicInterp(StartLocation, StartDerivative, TargetLocation, TargetDerivative, LerpRatio);
+	}
+	FVector InterpolateDerivative(float LerpRatio) const
+	{
+		return FMath::CubicInterpDerivative(StartLocation, StartDerivative, TargetLocation, TargetDerivative, LerpRatio);
+	}
+};
+
+```
+
+그 뒤 기존 ClientTick에서는 위에서 만든 구조체를 사용해서 코드 리팩토링을 진행했다.
+
+```C++
+void UGoKartMovementReplicator::ClientTick(float DeltaTime)
+{
+	ClientTimeSinceUpdate += DeltaTime;
+
+	// KINDA_SMALL_NUMBER : 굉장히 작은수를 뜻함 (0.000000001)
+	// 너무 작은수로 나누어서 선형보간에서 오류가 생기는 것을 방지
+	if (ClientTimeBetweenLastUpdates < KINDA_SMALL_NUMBER)
+		return;
+
+	if (MovementComponent == nullptr)
+		return;
+	float LerpRatio = ClientTimeSinceUpdate / ClientTimeBetweenLastUpdates;
+	float VelocityToDerivative = ClientTimeBetweenLastUpdates * 100;
+
+	FHermiteCubicSpline Spline = CreateSpline();
+
+	InterpolateLocation(Spline, LerpRatio);
+
+	InterpolateVelocity(Spline, LerpRatio);
+
+	InterpolateRotation(LerpRatio);
+}
+```
+
+CreateSpline
+
+```C++
+FHermiteCubicSpline UGoKartMovementReplicator::CreateSpline()
+{
+	FHermiteCubicSpline Spline;
+	// 전후진 속도를 고려한 CubicInterp을 사용한 보간
+	Spline.TargetLocation = ServerState.Transform.GetLocation();
+	Spline.StartLocation = ClientStartTransform.GetLocation();
+
+	// CubicInterp을 사용하기 위한 도함수 계산
+
+	Spline.StartDerivative = ClientStartVelocity * VelocityToDerivative();
+	Spline.TargetDerivative = ServerState.Velocity * VelocityToDerivative();
+
+	return Spline;
+}
+
+```
+
+InterpolateLocation
+
+```C++
+void UGoKartMovementReplicator::InterpolateLocation(const FHermiteCubicSpline &Spline, float LerpRatio)
+{
+	FVector NewLocation = Spline.InterpolateLocation(LerpRatio);
+	GetOwner()->SetActorLocation(NewLocation);
+}
+```
+
+InterpolateVelocity
+
+```C++
+void UGoKartMovementReplicator::InterpolateVelocity(const FHermiteCubicSpline &Spline, float LerpRatio)
+{
+
+	FVector NewDerivative = Spline.InterpolateDerivative(LerpRatio);
+	FVector NewVelocity = NewDerivative / VelocityToDerivative();
+	MovementComponent->SetVelocity(NewVelocity);
+}
+
+```
+
+InterpolateRotation
+
+```C++
+void UGoKartMovementReplicator::InterpolateRotation(float LerpRatio)
+{
+	// 회전 선형보간
+	FQuat TargetRotation = ServerState.Transform.GetRotation();
+	FQuat StartRotation = ClientStartTransform.GetRotation();
+
+	FQuat NewRotation = FQuat::Slerp(StartRotation, TargetRotation, LerpRatio);
+
+	GetOwner()->SetActorRotation(NewRotation);
+}
+```
