@@ -62,3 +62,43 @@ void UGoKartMovementReplicator::InterpolateRotation(float LerpRatio)
 ```
 
 이를 통해서 MeshOffset과 Collider를 구분하는 근사화 작업을 진행했다.
+
+## 고급 치트 방지
+
+기존에 치트 방지 코드는 Throttle과 SteeringThrow만을 검사하고 있었지만 실제로는 서버에 오게 되는 변조가 가능한 데이터들을 전부 검사해야 올바른 치트 방지를 할 수 있다. 그래서 DeltaTime 등에 서버에 오게되는 시간 정보가 실제 서버 시간보다 빠르다면 이는 변조가 가해진 데이터로 판단해 막는 코드를 구성했다.
+
+코드를 보게 되면 서버에서 관리하는 시간과 클라이언트에서 제시한 DeltaTime을 더해 ProposedTime을 구하고 이를 서버의 현시간<code>GetWorld()->TimeSeconds</code>과 대조해서 만약 이 시간보다 빠르다면 이를 차단한다.
+
+```C++
+
+bool UGoKartMovementReplicator::Server_SendMove_Validate(FGoKartMove Move)
+{
+	float ProposedTime = ClientSimulatedTime + Move.DeltaTime;
+	bool ClientNotRunningAhead = ProposedTime < GetWorld()->TimeSeconds;
+	if (!ClientNotRunningAhead)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Client is running too fast."));
+		return false;
+	}
+
+	if (!Move.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Received invalid move."));
+		return false;
+	}
+
+	return true;
+}
+
+```
+
+위 코드 중 IsValid의 구현은 아래와 같고 Throttle과 SteeringThrow의 범위를 체크한다.
+
+```C++
+	bool IsValid() const
+	{
+		return FMath::Abs(Throttle) <= 1 && FMath::Abs(SteeringThrow) <= 1;
+	}
+```
+
+물론 이러한 코드를 구성한다고 모든 치트를 막을 수 있는 것은 아니다. 윈도우 자체 기능을 통한 변조 등 수많은 방법이 있고 안티 치트는 끝없는 막고 뚫는 싸움이기에 최대한 많은 치트를 막을 코드를 끊임없이 고민해야한다.
