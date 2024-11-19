@@ -1,0 +1,47 @@
+# auto
+
+* auto도 Templated의 형식 연역을 따른다.
+
+## 사용 시기
+
+* 확장이 용이하기에 명시적 선언을 할 때는 쓰는 것이 좋다.
+* 특히 긴 클래스 네임 같은 곳에서 사용하면 편리하다.
+<br>
+
+## auto와 template의 연역 방식 차이
+
+auto는 std::initializer\_list 를 가정하기에 아래에서도 std::initializer\_list\<int>로 받아드린다
+
+```C++
+auto x={11,23,9};
+```
+
+template은 std::initializer\_list가정하지 않기에 아래의 경우 오류가 발생
+
+```C++
+template<typename T>
+void f(T param);
+
+f({11,23,9});
+```
+
+해결하는 방법은 std::initializer\_list를 명시해주어야 한다.
+
+```C++
+template<typename T>
+void f(std::initializer_list<T> param);
+
+f({11,23,9});
+```
+
+이러한 템플릿 형식 연역의 규칙이 람다에도 적용되기에 auto로 반환형을 지정했을 때 중괄호로 반환하려고 하면 오류가 발생한다.
+
+## 
+
+## auto가 원치 않는 형식으로 초기화 됐을 때 방법
+
+보이지 않는 대리자 형식을 오른 값에 넣게 되면 auto 의 형 변환이 원치 않는 구조가 될 수 있는데 이 때 명시적 형식의 초기치 사용하면 된다. (static\_cast<>);
+
+```C++
+auto sum= static_cast<Matrix>(m1+m2+m3+m4);
+```
